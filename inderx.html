@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 视口设置：适配移动端，禁止缩放 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>每日一色 | 东方美学</title>
+    
+    <!-- PWA 配置 (需配合 manifest.json) -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#fdfbf7">
+    
+    <!-- iOS 专用配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- 引入 html2canvas 用于生成卡片图片 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #8FD4D2; /* 动态主色 */
+            --bg-paper: #fdfbf7;
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* 全局重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif; /* 优先宋体/楷体 */
+            background-color: var(--bg-paper);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            /* 纸张噪点纹理背景 */
+            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            overscroll-behavior-y: none;
+        }
+
+        /* === 卡片主体 === */
+        .card-container {
+            width: 100%;
+            max-width: 380px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+            overflow: hidden;
+            position: relative;
+            transition: transform 0.3s ease;
+            background-color: #fff; /* 截图背景色 */
+        }
+
+        /* 顶部颜色区 */
+        .color-header {
+            height: 240px;
+            background-color: var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            color: #fff;
+            transition: background-color 0.8s ease;
+        }
+
+        /* 日期徽章 */
+        .date-badge {
+            position: absolute; top: 20px; left: 20px;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 6px 4px; border-radius: 30px;
+            writing-mode: vertical-rl; font-size: 0.85rem; letter-spacing: 2px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .lunar-date {
+            position: absolute; right: 20px; top: 20px;
+            writing-mode: vertical-rl; font-size: 0.9rem; opacity: 0.9; font-weight: bold;
+        }
+
+        /* 颜色名 */
+        .title-group { text-align: center; z-index: 2; }
+        .color-name { 
+            font-size: 3.5rem; font-weight: 900; letter-spacing: 8px; 
+            margin-left: 8px; text-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+        }
+        .color-pinyin { 
+            font-family: 'Helvetica Neue', sans-serif; font-size: 0.75rem; 
+            letter-spacing: 4px; opacity: 0.85; text-transform: uppercase; margin-top: 5px; 
+        }
+        .hex-code {
+            margin-top: 8px; font-size: 0.65rem; opacity: 0.6; font-family: monospace;
+        }
+
+        /* 内容区 */
+        .content-body { padding: 25px; }
+
+        /* 图片容器 */
+        .image-box {
+            width: 100%; height: 180px; border-radius: 10px;
+            overflow: hidden; margin-bottom: 20px; position: relative;
+            background: #f0f0f0; /* 图片加载前的底色 */
+        }
+        .image-box img { 
+            width: 100%; height: 100%; object-fit: cover; 
+            transition: opacity 0.5s ease; opacity: 0; /* 默认透明，加载完显示 */
+        }
+        .image-caption {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+            color: rgba(255,255,255,0.95); font-size: 0.7rem; padding: 8px 12px; text-align: right;
+        }
+
+        /* 文字描述 */
+        .desc-text { 
+            font-size: 0.95rem; line-height: 1.8; color: #555; 
+            text-align: justify; margin-bottom: 20px; 
+        }
+        
+        /* 诗词 */
+        .poem-box { 
+            border-left: 3px solid var(--primary-color); 
+            padding-left: 15px; margin: 20px 0; 
+            transition: border-color 0.8s ease;
+        }
+        .poem-line { font-size: 1.1rem; font-weight: bold; color: #222; display: block; margin-bottom: 5px; }
+        .poem-author { font-size: 0.8rem; color: #999; margin-top: 8px; }
+
+        /* 底部 */
+        .footer-area {
+            margin-top: 25px; border-top: 1px dashed #eee; padding-top: 15px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+        }
+        .stamp {
+            width: 32px; height: 32px; border: 2px solid #d00; color: #d00;
+            font-size: 10px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; writing-mode: vertical-rl; opacity: 0.8; font-weight: bold;
+        }
+
+        /* === 按钮区 === */
+        .action-bar {
+            margin-top: 30px;
+            margin-bottom: calc(20px + var(--safe-area-bottom));
+            display: flex; gap: 15px; z-index: 10;
+        }
+        .btn {
+            padding: 12px 24px; border: none; border-radius: 50px;
+            font-size: 0.9rem; font-weight: bold; cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: #333; color: white; }
+        .btn-secondary { background: white; color: #555; }
+        
+        /* 初始隐藏安装按钮 */
+        #installBtn { display: none; background: var(--primary-color); color: white; }
+
+        /* 动画类 */
+        .loading { opacity: 0; transform: translateY(10px); }
+        .loaded { opacity: 1; transform: translateY(0); transition: all 0.8s ease; }
+
+    </style>
+</head>
+<body>
+
+    <!-- 卡片区域 (截图范围) -->
+    <div class="card-container loading" id="captureArea">
+        <div class="color-header">
+            <div class="date-badge" id="solarDate">...</div>
+            <div class="lunar-date" id="lunarDate">...</div>
+            
+            <div class="title-group">
+                <div class="color-name" id="colorName"></div>
+                <div class="color-pinyin" id="colorPinyin"></div>
+                <div class="hex-code" id="colorHex"></div>
+            </div>
+        </div>
+
+        <div class="content-body">
+            <div class="image-box">
+                <!-- crossorigin 属性对于 html2canvas 跨域截图至关重要 -->
+                <img id="colorImage" src="" crossorigin="anonymous" alt="意境图">
+                <div class="image-caption" id="imageCaption"></div>
+            </div>
+
+            <div class="desc-text" id="colorDesc"></div>
+
+            <div class="poem-box">
+                <span class="poem-line" id="poemLine1"></span>
+                <span class="poem-line" id="poemLine2"></span>
+                <div class="poem-author" id="poemAuthor"></div>
+            </div>
+
+            <div class="footer-area">
+                <span style="font-size:0.7rem; color:#ccc; letter-spacing: 1px;">每日一色 · 寻美中国</span>
+                <div class="stamp">国色<br>天香</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="action-bar">
+        <button class="btn btn-primary" onclick="downloadCard()">
+            <span>📥 保存卡片</span>
+        </button>
+        <button class="btn btn-secondary" onclick="renderNextDay()">
+            <span>🗓 预览明日</span>
+        </button>
+        <button class="btn" id="installBtn">
+            <span>📲 安装App</span>
+        </button>
+    </div>
+
+    <script>
+        // ================= 1. 完整数据源 =================
+        // keyword 用于 AI 生成国风图片
+        const colorsDB = [
+            // 第一组
+            {
+                name: "梅红", pinyin: "MEIHONG", hex: "#C45A65",
+                desc: "梅花正艳之色。傲雪凌霜，红梅报春。这种红不媚俗，透着一种坚韧与孤傲的生命力。",
+                poem: ["寻常一样窗前月", "才有梅花便不同"], author: "宋·杜磊",
+                keyword: "red plum blossom flower winter snow chinese painting", caption: "寒梅傲雪"
+            },
+            {
+                name: "鞠衣", pinyin: "JUYI", hex: "#D6E5CC",
+                desc: "古代后妃在桑蚕季节所穿的黄绿色礼服，如初春桑叶，象征着生机与农桑之始。",
+                poem: ["鞠衣黄如嫩", "那得一旦如许长"], author: "宋·王安石",
+                keyword: "tender mulberry leaves light green silk fabric chinese art", caption: "春桑初生"
+            },
+            {
+                name: "松花", pinyin: "SONGHUA", hex: "#FAEA48",
+                desc: "松树花粉的嫩黄色。轻盈透亮，古人常以此色制笺或形容初春的柳色，带着一种山林的清气。",
+                poem: ["轻汗微微透碧纨", "明朝端午浴芳兰"], author: "宋·苏轼",
+                keyword: "pine pollen yellow willow spring chinese landscape", caption: "松花酿酒"
+            },
+            {
+                name: "丁香", pinyin: "DINGXIANG", hex: "#CCA4E3",
+                desc: "丁香花蕾之紫。淡雅幽怨，常被文人用来形容结着愁怨的姑娘，或是江南雨巷中那抹挥之不去的紫色。",
+                poem: ["青鸟不传云外信", "丁香空结雨中愁"], author: "五代·李璟",
+                keyword: "lilac flower purple rain alley chinese painting", caption: "丁香结愁"
+            },
+            {
+                name: "麹尘", pinyin: "QUCHEN", hex: "#B0964D",
+                desc: "酒曲上菌尘的淡黄色。古时常用此色形容初春嫩柳，朦胧如烟，是春天最早的颜色之一。",
+                poem: ["麹尘轻软柳丝金", "且就在、手里看"], author: "宋·苏轼",
+                keyword: "willow branches mist dust yellow chinese art", caption: "柳色如烟"
+            },
+            {
+                name: "缃叶", pinyin: "XIANGYE", hex: "#ECD452",
+                desc: "浅黄色的桑叶。古时书卷多用淡黄色的纸张或绢帛，故书套称为“缃帙”，充满书卷气。",
+                poem: ["缃绮为下裙", "紫绮为上襦"], author: "汉乐府",
+                keyword: "ancient chinese scroll book paper yellow silk", caption: "古籍书卷"
+            },
+            {
+                name: "沧浪", pinyin: "CANGLANG", hex: "#58ACD3",
+                desc: "青苍色的水波。既指水的颜色，也指一种超脱世俗、寄情山水的生活态度，清澈而自由。",
+                poem: ["沧浪之水清兮", "可以濯我缨"], author: "先秦·孺子歌",
+                keyword: "blue river water wave chinese ink painting", caption: "沧浪濯缨"
+            },
+            {
+                name: "东方亮", pinyin: "DONGFANGLIANG", hex: "#F3F9F1",
+                desc: "黎明时分东方天际透出的鱼肚白。微微泛着淡粉或淡青，寓意着希望与新的开始。",
+                poem: ["东方之日兮", "彼姝者子"], author: "诗经",
+                keyword: "morning sky dawn white mist chinese landscape", caption: "晓色朦胧"
+            },
+            // 第二组
+            {
+                name: "胭脂", pinyin: "YANZHI", hex: "#9D2933",
+                desc: "色泽浓艳而不俗，如春日盛开的海棠，带着几分醉人的妩媚与热烈。",
+                poem: ["棠梨叶落胭脂色", "荞麦花开白雪香"], author: "宋·王禹偁",
+                keyword: "chinese rouge makeup red powder vintage box", caption: "海棠春色"
+            },
+            {
+                name: "缙云", pinyin: "JINYUN", hex: "#EE7959",
+                desc: "赤色的云霞。此色如缭绕山间的红霞，神圣而庄严。",
+                poem: ["飞香上云辇", "落花满皇都"], author: "南北朝·萧纲",
+                keyword: "red clouds sunset mountain chinese painting", caption: "云霞满天"
+            },
+            {
+                name: "福色", pinyin: "FUSE", hex: "#F35C6E",
+                desc: "一种鲜亮喜庆的深粉红。旧时寓意吉祥纳福，常用于节庆服饰或装饰。",
+                poem: ["爆竹声中一岁除", "春风送暖入屠苏"], author: "宋·王安石",
+                keyword: "chinese new year red lantern festival happiness", caption: "吉庆纳福"
+            },
+            {
+                name: "苏方", pinyin: "SUFANG", hex: "#973C3F",
+                desc: "苏木染出的深沉暗红色。沉稳内敛，常用于官服或名贵织物。",
+                poem: ["红罗複斗帐", "四角垂苏方"], author: "古乐府",
+                keyword: "dark red silk fabric chinese pattern texture", caption: "织物华章"
+            },
+            {
+                name: "菡萏", pinyin: "HANDAN", hex: "#F69C9F",
+                desc: "荷花的别称，特指未开的花苞。如娇羞的少女，粉嫩中透着清雅。",
+                poem: ["菡萏香销翠叶残", "西风愁起绿波间"], author: "五代·李璟",
+                keyword: "lotus bud pink flower pond chinese ink art", caption: "荷塘清趣"
+            },
+            {
+                name: "柘黄", pinyin: "ZHEHUANG", hex: "#F9C116",
+                desc: "用柘木汁染出的赤黄色。自隋唐起成为帝王服色，象征皇权尊贵。",
+                poem: ["赭袍新著紫微郎", "上帝临轩作试场"], author: "唐·徐夤",
+                keyword: "imperial yellow robe dragon pattern chinese", caption: "皇权贵气"
+            },
+            {
+                name: "伽罗", pinyin: "JIALUO", hex: "#625C52",
+                desc: "沉香之色，深褐带黑。色沉静幽玄，自带一种禅意与岁月的厚重感。",
+                poem: ["博山炉中沉香火", "双烟一气凌紫霞"], author: "唐·李白",
+                keyword: "agarwood incense smoke zen dark wood", caption: "沉香古意"
+            },
+            {
+                name: "浅云", pinyin: "QIANYUN", hex: "#E4EFE9",
+                desc: "极淡的云灰色。如晴空高处的一抹薄云，若有似无，清淡高雅。",
+                poem: ["行到水穷处", "坐看云起时"], author: "唐·王维",
+                keyword: "light clouds sky minimalism chinese art", caption: "云卷云舒"
+            },
+            // 第三组
+            {
+                name: "月白", pinyin: "YUEBAI", hex: "#D6ECF0",
+                desc: "月下白雪，白中泛蓝。清冷高洁，如同月光洒在雪地上，静谧而空灵。",
+                poem: ["月白风清良夜何", "便觉眼前生意满"], author: "宋·苏轼",
+                keyword: "moonlight snow white blue cold night", caption: "月色如水"
+            },
+            {
+                name: "绿沉", pinyin: "LVCHEN", hex: "#0C4842",
+                desc: "深沉的暗绿色。厚重如深潭，常用来形容兵器或瓜果，透着深不可测的质感。",
+                poem: ["绿沉金锁管钱囊", "只是从前欠蕴藏"], author: "宋·范成大",
+                keyword: "deep dark green pool water jade texture", caption: "深潭碧影"
+            },
+            {
+                name: "天缥", pinyin: "TIANPIAO", hex: "#D5EBE1",
+                desc: "天空淡淡的青白色，如初秋清晨的微风，清朗明净。",
+                poem: ["天缥浮云白", "流苏明月圆"], author: "南北朝·谢朓",
+                keyword: "light cyan sky breeze clear air", caption: "碧空如洗"
+            },
+            {
+                name: "黄丹", pinyin: "HUANGDAN", hex: "#FF461F",
+                desc: "即铅丹，鲜艳的橙红色。如初升红日，炽热夺目。",
+                poem: ["颜如丹酡", "目如秋波"], author: "战国·宋玉",
+                keyword: "orange red vermilion powder pigment", caption: "丹霞似火"
+            },
+            {
+                name: "米汤娇", pinyin: "MITANGJIAO", hex: "#F2EBD9",
+                desc: "如浓稠米汤般的暖白色。温润柔和，带着一种世俗生活的烟火气与温馨。",
+                poem: ["日照新妆水底明", "风飘香袂空中举"], author: "唐·李白",
+                keyword: "rice soup white creamy warm texture", caption: "温润如玉"
+            },
+            {
+                name: "青金石", pinyin: "QINGJINSHI", hex: "#1A5599",
+                desc: "色相如天的深蓝色宝石。色泽浓郁高贵，常点缀金屑，如星空璀璨。",
+                poem: ["色相如天", "光澄若水"], author: "古籍描述",
+                keyword: "lapis lazuli stone blue gold dust texture", caption: "深蓝星空"
+            },
+            {
+                name: "琅玕紫", pinyin: "LANGGANZI", hex: "#6D2E5B",
+                desc: "这种紫色如玉般润泽，神秘而高雅，透着一种传说中的仙气。",
+                poem: ["服以琅玕", "游于无极"], author: "庄子",
+                keyword: "purple jade gemstone mysterious fog", caption: "紫玉生烟"
+            },
+            // 第四组
+            {
+                name: "朱颜酡", pinyin: "ZHUYANTUO", hex: "#F28D88",
+                desc: "饮酒后脸上泛起的红晕。微醺之美，艳若桃花，带着三分醉意与七分娇羞。",
+                poem: ["落日熔金，暮云合璧", "人在何处"], author: "宋·李清照",
+                keyword: "blush pink face peach blossom wine drunk", caption: "晚照微醺"
+            },
+            {
+                name: "石绿", pinyin: "SHILV", hex: "#225A43",
+                desc: "取自矿物孔雀石，重彩画颜料。常绘于千里江山之中，苍翠欲滴。",
+                poem: ["客路青山外", "行舟绿水前"], author: "唐·王湾",
+                keyword: "malachite green mineral landscape painting", caption: "青绿山水"
+            },
+            {
+                name: "半见", pinyin: "BANJIAN", hex: "#F7F3D3",
+                desc: "极浅的黄色，隐约可见。如庶民的衣着，朴素低调，含蓄而不张扬。",
+                poem: ["半见春风半见花", "一帘疏雨湿窗纱"], author: "古诗意向",
+                keyword: "pale yellow fabric curtain faint light", caption: "朦胧微光"
+            },
+            {
+                name: "魏红", pinyin: "WEIHONG", hex: "#C91F37",
+                desc: "洛阳牡丹名品中的红牡丹色。色泽艳丽端庄，雍容华贵，国色天香。",
+                poem: ["唯有牡丹真国色", "花开时节动京城"], author: "唐·刘禹锡",
+                keyword: "red peony flower noble chinese painting", caption: "国色天香"
+            },
+            {
+                name: "欧碧", pinyin: "OUBI", hex: "#C0D695",
+                desc: "牡丹名品，泛着碧色的花。清新脱俗，如碧玉妆成。",
+                poem: ["疑是洛川神女作", "千娇万态破朝霞"], author: "唐·徐凝",
+                keyword: "green peony flower jade chinese art", caption: "碧玉妆成"
+            },
+            {
+                name: "无心绿", pinyin: "WUXINLV", hex: "#A9BE7B",
+                desc: "淡淡的草绿。取意“云无心以出岫”，是一种自然随意、不加雕饰的绿。",
+                poem: ["云无心以出岫", "鸟倦飞而知还"], author: "晋·陶渊明",
+                keyword: "light green grass nature zen simple", caption: "归园田居"
+            },
+            {
+                name: "吉翠", pinyin: "JICUI", hex: "#3A7288",
+                desc: "翠鸟羽毛的蓝色。鲜艳华丽，古人常用点翠工艺装饰首饰。",
+                poem: ["翡翠巢南海", "雄雌珠树林"], author: "唐·陈子昂",
+                keyword: "kingfisher feather blue jewelry chinese", caption: "点翠华光"
+            },
+            // 第五组
+            {
+                name: "雄黄", pinyin: "XIONGHUANG", hex: "#FF9900",
+                desc: "矿物颜料，橘黄色。端午节饮雄黄酒以辟邪。代表着驱除邪祟的正气。",
+                poem: ["唯有儿时不可忘", "持艾簪蒲额头王"], author: "怀念",
+                keyword: "realgar orange powder mineral chinese medicine", caption: "端阳正气"
+            },
+            {
+                name: "玄天", pinyin: "XUANTIAN", hex: "#2D2E36",
+                desc: "黎明前天空的黑中透红之色。玄为天色，深奥、神秘，是宇宙最初的底色。",
+                poem: ["天地玄黄", "宇宙洪荒"], author: "千字文",
+                keyword: "dark night sky universe stars mysterious", caption: "浩瀚穹苍"
+            },
+            {
+                name: "十样锦", pinyin: "SHIYANGJIN", hex: "#F8C3CD",
+                desc: "一种娇嫩的粉红色花卉。繁花似锦，柔美烂漫，如春日最美的相遇。",
+                poem: ["锦里开芳宴", "兰岗艳早年"], author: "唐·卢照邻",
+                keyword: "pink flowers blooming garden lovely", caption: "繁花似锦"
+            },
+            {
+                name: "朱樱", pinyin: "ZHUYING", hex: "#B62F2D",
+                desc: "成熟樱桃的深红色。晶莹剔透，色泽诱人。",
+                poem: ["绿葱葱，几颗樱桃叶底红", ""], author: "宋·赵彦端",
+                keyword: "red cherries fruit ripe juicy", caption: "樱桃欲滴"
+            },
+            {
+                name: "杨妃", pinyin: "YANGFEI", hex: "#F09199",
+                desc: "如贵妃醉酒之态，又如荔枝剥壳后的膜色，娇艳欲滴，妩媚动人。",
+                poem: ["一骑红尘妃子笑", "无人知是荔枝来"], author: "唐·杜牧",
+                keyword: "lychee fruit pink beauty chinese history", caption: "贵妃醉酒"
+            },
+            {
+                name: "青骊", pinyin: "QINGLI", hex: "#424C50",
+                desc: "深黑色的马。色泽如铁，坚毅沉稳。形容骏马神采飞扬。",
+                poem: ["四牡騑騑", "六辔如琴"], author: "诗经",
+                keyword: "black horse steed iron armor strong", caption: "铁马冰河"
+            },
+            {
+                name: "银朱", pinyin: "YINZHU", hex: "#F43E06",
+                desc: "人工炼制的朱红色颜料。红得透亮，常用于印泥，代表着承诺与印记。",
+                poem: ["又恐被、秋风惊绿", "若待得君来向此"], author: "宋·晏几道",
+                keyword: "vermilion red seal paste chinese stamp", caption: "丹心一片"
+            },
+            // 第六组
+            {
+                name: "松石", pinyin: "SONGSHI", hex: "#44B5C6",
+                desc: "绿松石色，介于蓝绿之间。像高原上的湖泊，纯净而神圣。",
+                poem: ["一池春水绿", "满架蔷薇红"], author: "古诗意向",
+                keyword: "turquoise gemstone blue green lake water", caption: "碧水微澜"
+            },
+            {
+                name: "霁红", pinyin: "JIHONG", hex: "#A62E2E",
+                desc: "祭红釉，瓷器中的珍品。如雨后红霞凝固在瓷器之上，莹润厚重。",
+                poem: ["雨过天晴云破处", "千峰碧波翠色来"], author: "瓷器意向",
+                keyword: "red porcelain glaze ceramic chinese vase", caption: "雨后红霞"
+            },
+            {
+                name: "岱赭", pinyin: "DAIZHE", hex: "#9B6E5F",
+                desc: "泰山之土的红褐色。这是一种浑厚的大地之色，象征着稳重与根基。",
+                poem: ["岱宗夫如何", "齐鲁青未了"], author: "唐·杜甫",
+                keyword: "mount tai earth soil brown mountain", caption: "巍巍岱宗"
+            },
+            {
+                name: "凝夜紫", pinyin: "NINGYEZI", hex: "#422256",
+                desc: "严寒的夜晚，空气凝结呈现的暗紫色。战场上的悲壮之色，透着寒冷与孤寂。",
+                poem: ["角声满天秋色里", "塞上燕脂凝夜紫"], author: "唐·李贺",
+                keyword: "purple night cold battlefield winter", caption: "塞上秋寒"
+            },
+            {
+                name: "海天霞", pinyin: "HAITIANXIA", hex: "#F3A694",
+                desc: "明代宫廷流行色，如海上霞光映照。淡雅的橙红色，轻盈通透。",
+                poem: ["落霞与孤鹜齐飞", "秋水共长天一色"], author: "唐·王勃",
+                keyword: "sunset glow sea sky pink orange", caption: "霞光万道"
+            },
+            {
+                name: "远山黛", pinyin: "YUANSHANDAI", hex: "#455667",
+                desc: "远山的颜色，青黑如黛。常用来形容女子的眉色，含蓄蕴藉，如水墨画般淡雅。",
+                poem: ["眉如远山含黛", "目似秋水横波"], author: "古籍形容",
+                keyword: "distant mountains ink painting eyebrows", caption: "眉黛青颦"
+            }
+        ];
+
+        let offsetDays = 0; // 预览偏移量
+
+        // ================= 2. 辅助功能 =================
+        
+        // 获取农历 (使用原生 Intl API)
+        function getLunarDate(date) {
+            const formatter = new Intl.DateTimeFormat('zh-CN', { calendar: 'chinese', day: 'numeric', month: 'short' });
+            return formatter.format(date).replace('月', '月·');
+        }
+
+        // ================= 3. 渲染逻辑 =================
+        function render() {
+            const today = new Date();
+            today.setDate(today.getDate() + offsetDays);
+            
+            // 计算是一年中的第几天，作为索引
+            const start = new Date(today.getFullYear(), 0, 0);
+            const diff = today - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            const dayOfYear = Math.floor(diff / oneDay);
+            
+            // 取模循环
+            const data = colorsDB[dayOfYear % colorsDB.length];
+
+            // 更新文本 DOM
+            document.getElementById('solarDate').innerText = `${today.getMonth()+1}月${today.getDate()}日`;
+            document.getElementById('lunarDate').innerText = getLunarDate(today);
+            
+            document.getElementById('colorName').innerText = data.name;
+            document.getElementById('colorPinyin').innerText = data.pinyin;
+            document.getElementById('colorHex').innerText = data.hex;
+            
+            document.getElementById('colorDesc').innerText = data.desc;
+            document.getElementById('poemLine1').innerText = data.poem[0];
+            document.getElementById('poemLine2').innerText = data.poem[1] || "";
+            document.getElementById('poemAuthor').innerText = `—— ${data.author}`;
+            document.getElementById('imageCaption').innerText = data.caption;
+
+            // 更新主题色
+            document.documentElement.style.setProperty('--primary-color', data.hex);
+
+            // 更新图片：使用 Pollinations AI
+            // seed=dayOfYear 确保每天图片固定，不闪烁
+            const imgEl = document.getElementById('colorImage');
+            const prompt = encodeURIComponent(`Traditional Chinese ink painting style, minimalist, high quality, ${data.keyword}`);
+            const imgUrl = `https://image.pollinations.ai/prompt/${prompt}?width=600&height=400&nologo=true&seed=${dayOfYear}`;
+            
+            imgEl.style.opacity = 0; // 先隐藏
+            imgEl.src = imgUrl;
+            imgEl.onload = () => { imgEl.style.opacity = 1; }; // 加载完显示
+
+            // 触发入场动画
+            const card = document.getElementById('captureArea');
+            card.classList.remove('loaded');
+            setTimeout(() => card.classList.add('loaded'), 50);
+        }
+
+        // ================= 4. 截图保存 =================
+        function downloadCard() {
+            const btn = document.querySelector('.btn-primary');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "<span>⏳ 生成中...</span>";
+            
+            html2canvas(document.getElementById('captureArea'), { 
+                scale: 2, 
+                useCORS: true, 
+                backgroundColor: "#ffffff" 
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `每日一色_${document.getElementById('colorName').innerText}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                btn.innerHTML = originalText;
+            }).catch(err => {
+                console.error(err);
+                alert("保存失败，请尝试长按图片保存");
+                btn.innerHTML = originalText;
+            });
+        }
+
+        function renderNextDay() { 
+            offsetDays++; 
+            render(); 
+        }
+
+        // ================= 5. PWA 安装引导 =================
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('installBtn');
+            installBtn.style.display = 'flex';
+            
+            installBtn.addEventListener('click', () => {
+                installBtn.style.display = 'none';
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            });
+        });
+
+        // 注册 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .catch(err => console.log('SW registration failed: ', err));
+            });
+        }
+
+        // 启动
+        render();
+
+    </script>
+</body>
+</html>

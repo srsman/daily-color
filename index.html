@@ -69,16 +69,36 @@
         }
 
         /* 日期徽章 */
+/* 左侧：公历日期 */
         .date-badge {
-            position: absolute; top: 20px; left: 20px;
-            border: 1px solid rgba(255,255,255,0.3);
-            padding: 6px 4px; border-radius: 30px;
-            writing-mode: vertical-rl; font-size: 0.85rem; letter-spacing: 2px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: absolute; 
+            top: 25px; 
+            left: 25px;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 10px 4px; /* 增加高度，让文字不拥挤 */
+            border-radius: 30px;
+            writing-mode: vertical-rl; /* 竖排 */
+            text-orientation: upright; /* 【关键】强制文字直立，不旋转 */
+            font-size: 0.85rem; 
+            letter-spacing: 4px; /* 增加字间距，更有呼吸感 */
+            color: rgba(255,255,255,0.9);
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; /* 强制用楷体 */
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
+
+        /* 右侧：农历日期 */
         .lunar-date {
-            position: absolute; right: 20px; top: 20px;
-            writing-mode: vertical-rl; font-size: 0.9rem; opacity: 0.9; font-weight: bold;
+            position: absolute; 
+            right: 25px; 
+            top: 25px;
+            writing-mode: vertical-rl; 
+            text-orientation: upright; /* 【关键】强制直立 */
+            font-size: 0.9rem; 
+            opacity: 0.9; 
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #fff;
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
         }
 
         /* 颜色名 */
@@ -495,7 +515,23 @@
             const formatter = new Intl.DateTimeFormat('zh-CN', { calendar: 'chinese', day: 'numeric', month: 'short' });
             return formatter.format(date).replace('月', '月·');
         }
-
+// === 新增工具函数：数字转中文 (用于日期) ===
+        function toChineseNum(num) {
+            const changeNum = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+            if (num <= 10) {
+                return changeNum[num];
+            } else if (num < 20) {
+                return '十' + changeNum[num % 10]; // 11 -> 十一
+            } else if (num === 20) {
+                return '二十';
+            } else if (num < 30) {
+                return '二十' + changeNum[num % 10]; // 21 -> 二十一
+            } else if (num === 30) {
+                return '三十';
+            } else {
+                return '三十' + changeNum[num % 10];
+            }
+        }
         // ================= 3. 渲染逻辑 =================
         function render() {
             const today = new Date();

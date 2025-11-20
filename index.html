@@ -154,10 +154,24 @@
             margin-top: 25px; border-top: 1px dashed #eee; padding-top: 15px;
             display: flex; justify-content: space-between; align-items: flex-end;
         }
+/* 底部印章 (修复截图重叠问题版) */
         .stamp {
-            width: 32px; height: 32px; border: 2px solid #d00; color: #d00;
-            font-size: 10px; display: flex; align-items: center; justify-content: center;
-            border-radius: 4px; writing-mode: vertical-rl; opacity: 0.8; font-weight: bold;
+            width: 34px; /*稍微加宽一点点防止换行*/
+            height: 34px;
+            border: 2px solid #d00;
+            color: #d00;
+            font-size: 10px;
+            /* === 关键修改开始 === */
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            gap: 3px; /* 两列文字之间的间距 */
+            /* 移除 writing-mode，改用 flex 布局模拟 */
+            /* === 关键修改结束 === */
+            border-radius: 4px;
+            opacity: 0.8;
+            font-weight: bold;
+            line-height: 1.2;
         }
 
         /* === 按钮区 === */
@@ -216,9 +230,23 @@
                 <div class="poem-author" id="poemAuthor"></div>
             </div>
 
-            <div class="footer-area">
+<div class="footer-area">
                 <span style="font-size:0.7rem; color:#ccc; letter-spacing: 1px;">每日一色 · 寻美中国</span>
-                <div class="stamp">国色<br>天香</div>
+                
+                <!-- 修改后的印章结构：用两个 div 模拟两列竖排 -->
+                <div class="stamp">
+                    <!-- 左列 -->
+                    <div style="display:flex; flex-direction:column;">
+                        <span>天</span>
+                        <span>香</span>
+                    </div>
+                    <!-- 右列 -->
+                    <div style="display:flex; flex-direction:column;">
+                        <span>国</span>
+                        <span>色</span>
+                    </div>
+                </div>
+                
             </div>
         </div>
     </div>

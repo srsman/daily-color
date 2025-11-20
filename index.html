@@ -547,8 +547,15 @@
             const data = colorsDB[dayOfYear % colorsDB.length];
 
             // 更新文本 DOM
-            document.getElementById('solarDate').innerText = `${today.getMonth()+1}月${today.getDate()}日`;
-            document.getElementById('lunarDate').innerText = getLunarDate(today);
+// 更新文本 DOM (使用中文数字)
+            const solarMonth = toChineseNum(today.getMonth() + 1);
+            const solarDay = toChineseNum(today.getDate());
+            
+            // 左侧显示：十一月二十一日
+            document.getElementById('solarDate').innerText = `${solarMonth}月${solarDay}日`;
+            
+            // 右侧显示：去掉中间的点，直接显示农历
+            document.getElementById('lunarDate').innerText = getLunarDate(today).replace('月', '月 · ');
             
             document.getElementById('colorName').innerText = data.name;
             document.getElementById('colorPinyin').innerText = data.pinyin;

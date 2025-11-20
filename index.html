@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 视口设置：禁止缩放，适配刘海屏 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>每日一色</title>
+    
+    <!-- PWA 配置 -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#fdfbf7">
+    
+    <!-- iOS 专用配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="每日一色">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2903/2903558.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #8FD4D2;
+            --bg-paper: #fdfbf7;
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+            background-color: var(--bg-paper);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            /* 防止下拉刷新，更有App感 */
+            overscroll-behavior-y: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        }
+
+        /* 卡片样式优化 */
+        .card-container {
+            width: 100%;
+            max-width: 380px; /* 稍微调窄一点适配小屏 */
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+            overflow: hidden;
+            position: relative;
+            transition: transform 0.3s ease;
+            background-color: #fff; 
+        }
+
+        .color-header {
+            height: 240px; /* 增加高度 */
+            background-color: var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            color: #fff;
+            transition: background-color 0.6s ease;
+        }
+
+        .date-badge {
+            position: absolute; top: 20px; left: 20px;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 6px 4px; border-radius: 30px;
+            writing-mode: vertical-rl; font-size: 0.8rem; letter-spacing: 2px;
+        }
+        .lunar-date {
+            position: absolute; right: 20px; top: 20px;
+            writing-mode: vertical-rl; font-size: 0.9rem; opacity: 0.9;
+        }
+
+        .color-name { font-size: 3.5rem; font-weight: 900; letter-spacing: 8px; margin-left: 8px; text-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .color-pinyin { font-family: sans-serif; font-size: 0.7rem; letter-spacing: 4px; opacity: 0.8; text-transform: uppercase; margin-top: 5px; }
+        
+        .content-body { padding: 25px; }
+
+        .image-box {
+            width: 100%; height: 180px; border-radius: 12px;
+            overflow: hidden; margin-bottom: 20px; position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        .image-box img { width: 100%; height: 100%; object-fit: cover; }
+        .image-caption {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            color: rgba(255,255,255,0.95); font-size: 0.75rem; padding: 10px; text-align: right;
+        }
+
+        .desc-text { font-size: 0.95rem; line-height: 1.7; color: #555; text-align: justify; margin-bottom: 20px; }
+        
+        .poem-box { border-left: 3px solid var(--primary-color); padding-left: 15px; margin: 20px 0; }
+        .poem-line { font-size: 1.1rem; font-weight: bold; color: #222; display: block; margin-bottom: 4px; }
+        .poem-author { font-size: 0.8rem; color: #999; margin-top: 6px; }
+
+        .footer-area {
+            margin-top: 20px; border-top: 1px dashed #eee; padding-top: 15px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+        }
+        .stamp {
+            width: 32px; height: 32px; border: 2px solid #d00; color: #d00;
+            font-size: 10px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; writing-mode: vertical-rl; opacity: 0.8; font-weight: bold;
+        }
+
+        /* 按钮组 */
+        .action-bar {
+            margin-top: 30px;
+            margin-bottom: calc(20px + var(--safe-area-bottom));
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+        .btn {
+            padding: 12px 25px; border: none; border-radius: 50px;
+            font-size: 0.9rem; font-weight: bold; cursor: pointer;
+            transition: transform 0.1s; box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: #333; color: white; }
+        .btn-secondary { background: white; color: #555; }
+        
+        /* 安装按钮，默认隐藏 */
+        #installBtn { display: none; background: var(--primary-color); color: white; }
+
+        .loading { opacity: 0; transform: translateY(10px); }
+        .loaded { opacity: 1; transform: translateY(0); transition: all 0.8s ease; }
+    </style>
+</head>
+<body>
+
+    <div class="card-container loading" id="captureArea">
+        <div class="color-header">
+            <div class="date-badge" id="solarDate">...</div>
+            <div class="lunar-date" id="lunarDate">...</div>
+            <div class="color-name" id="colorName"></div>
+            <div class="color-pinyin" id="colorPinyin"></div>
+        </div>
+
+        <div class="content-body">
+            <div class="image-box">
+                <img id="colorImage" src="" crossorigin="anonymous" alt="意境图">
+                <div class="image-caption" id="imageCaption"></div>
+            </div>
+            <div class="desc-text" id="colorDesc"></div>
+            <div class="poem-box">
+                <span class="poem-line" id="poemLine1"></span>
+                <span class="poem-line" id="poemLine2"></span>
+                <div class="poem-author" id="poemAuthor"></div>
+            </div>
+            <div class="footer-area">
+                <span style="font-size:0.7rem; color:#ccc;">每日一色 · 寻美中国</span>
+                <div class="stamp">国色<br>天香</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-primary" onclick="downloadCard()">📥 保存</button>
+        <button class="btn btn-secondary" onclick="renderNextDay()">🗓 明日</button>
+        <button class="btn" id="installBtn">📲 安装App</button>
+    </div>
+
+    <script>
+        // 数据源
+        const colorsDB = [
+            { name: "天青", pinyin: "TIANQING", hex: "#8FD4D2", desc: "雨过天青云破处，这般颜色做将来。汝窑之魂，极简之美。", poem: ["雨过天青云破处", "这般颜色做将来"], author: "五代·柴荣", imgId: "photo-1603646648498-85c08280b72a", caption: "汝窑意境" },
+            { name: "胭脂", pinyin: "YANZHI", hex: "#9D2933", desc: "棠梨叶落胭脂色。女子盛妆之色，如醉人春意。", poem: ["棠梨叶落胭脂色", "荞麦花开白雪香"], author: "宋·王禹偁", imgId: "photo-1526278010388-54448a64f039", caption: "海棠春色" },
+            { name: "月白", pinyin: "YUEBAI", hex: "#D6ECF0", desc: "月下白雪，白中泛蓝。清冷高洁，古人常用于里衣。", poem: ["月白风清良夜何", "便觉眼前生意满"], author: "宋·苏轼", imgId: "photo-1483095348600-413744439277", caption: "月色如水" },
+            { name: "竹月", pinyin: "ZHUYUE", hex: "#407D98", desc: "竹林月色，幽蓝冷翠。隐士之色，清幽绝俗。", poem: ["竹月泛凉影", "萱露在此夕"], author: "唐·张九龄", imgId: "photo-1514068574489-503a8eb91592", caption: "竹影婆娑" },
+            { name: "秋香", pinyin: "QIUXIANG", hex: "#D9B611", desc: "秋日沉香，一种含蓄的黄绿色。温婉而有书卷气。", poem: ["桂花浮玉，正月满天街", "夜凉如洗"], author: "宋·谢逸", imgId: "photo-1621193677292-495555544a5f", caption: "金桂飘香" }
+        ];
+
+        let offsetDays = 0;
+
+        // 农历转换
+        function getLunarDate(date) {
+            return new Intl.DateTimeFormat('zh-CN', { calendar: 'chinese', day: 'numeric', month: 'short' }).format(date);
+        }
+
+        function render() {
+            const today = new Date();
+            today.setDate(today.getDate() + offsetDays);
+            
+            const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+            const data = colorsDB[dayOfYear % colorsDB.length];
+
+            document.getElementById('solarDate').innerText = `${today.getMonth()+1}月${today.getDate()}日`;
+            document.getElementById('lunarDate').innerText = getLunarDate(today).replace('月', '月·');
+            document.getElementById('colorName').innerText = data.name;
+            document.getElementById('colorPinyin').innerText = data.pinyin;
+            document.getElementById('colorDesc').innerText = data.desc;
+            document.getElementById('poemLine1').innerText = data.poem[0];
+            document.getElementById('poemLine2').innerText = data.poem[1] || "";
+            document.getElementById('poemAuthor').innerText = `—— ${data.author}`;
+            document.getElementById('imageCaption').innerText = data.caption;
+
+            document.documentElement.style.setProperty('--primary-color', data.hex);
+            document.getElementById('colorImage').src = `https://images.unsplash.com/${data.imgId}?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80`;
+
+            const card = document.getElementById('captureArea');
+            card.classList.remove('loaded');
+            setTimeout(() => card.classList.add('loaded'), 50);
+        }
+
+        function downloadCard() {
+            const btn = document.querySelector('.btn-primary');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳...";
+            html2canvas(document.getElementById('captureArea'), { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `每日一色_${document.getElementById('colorName').innerText}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                btn.innerText = originalText;
+            });
+        }
+
+        function renderNextDay() { offsetDays++; render(); }
+
+        // PWA 安装逻辑
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('installBtn');
+            installBtn.style.display = 'flex'; // 显示安装按钮
+            
+            installBtn.addEventListener('click', () => {
+                installBtn.style.display = 'none';
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            });
+        });
+
+        // 注册 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js');
+            });
+        }
+
+        render();
+    </script>
+</body>
+</html>

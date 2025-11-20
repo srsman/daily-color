@@ -1,0 +1,21 @@
+{
+  "name": "每日一色 | 东方美学",
+  "short_name": "每日一色",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fdfbf7",
+  "theme_color": "#8FD4D2",
+  "description": "每天一种中国传统色，领略国风雅韵。",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2903/2903558.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2903/2903558.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

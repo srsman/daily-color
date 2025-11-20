@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-color-v2';
+const CACHE_NAME = 'daily-color-v3';
 const ASSETS_TO_CACHE = [
   './index.html',
   './manifest.json',

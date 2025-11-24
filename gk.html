@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025高考难度多维科学分析 - 投入产出比视角</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .chart-container {
+            position: relative;
+            height: 600px;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">高考难度多维分析：拒绝单一维度</h1>
+            <p class="text-gray-600">
+                原图表仅展示了“录取率”（结果），本图表引入了<span class="font-bold text-blue-600">“准入门槛成本”</span>（房价、户口难度、养育成本）作为横坐标。
+                <br>
+                <span class="text-sm text-gray-500">* X轴数据基于各地房价收入比及落户难度综合估算，Y轴数据源自2025预测数据。</span>
+            </p>
+        </div>
+
+        <!-- Main Chart -->
+        <div class="chart-container" id="scatterChart"></div>
+
+        <!-- Analysis Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h3 class="font-bold text-blue-800 mb-2">💰 氪金玩家区 (右上)</h3>
+                <p class="text-sm text-blue-700">
+                    <strong>代表：北京、上海、天津</strong><br>
+                    虽然录取率高，但“门票”极贵。房价收入比极高，落户困难。这是“几代人财富积累换取的教育优势”，并非单纯的“轻松”。
+                </p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                <h3 class="font-bold text-green-800 mb-2">🎁 政策红利区 (左上)</h3>
+                <p class="text-sm text-green-700">
+                    <strong>代表：西藏、青海、宁夏</strong><br>
+                    真正的“简单模式”。生活成本相对较低，且享受国家政策倾斜，录取率高。但需忍受地理环境或教育资源差异。
+                </p>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                <h3 class="font-bold text-red-800 mb-2">🔥 极限内卷区 (右下/中下)</h3>
+                <p class="text-sm text-red-700">
+                    <strong>代表：河南、广东、山东</strong><br>
+                    典型的“地狱模式”。考生基数大（气泡大），录取率低，且部分省份（如广东）生活成本并不低。纯粹的人力竞争。
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm mt-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">如何反驳原图？</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <li><strong>反驳逻辑 1：</strong> 不要只看分母（考生人数），要看获得这个分母资格的代价。北京的6.8万考生背后，是极高的购房成本和户籍门槛筛选。</li>
+                <li><strong>反驳逻辑 2：</strong> 原图把北京列为“轻松模式”，但在本图中，北京位于最右侧（高成本）。如果把你父母买房的钱折算成补习费，它一点都不轻松。</li>
+                <li><strong>反驳逻辑 3：</strong> 真正的“困难”分为两种：一种是<strong>没钱进场</strong>（高房价壁垒），一种是<strong>进场后人太多</strong>（河南/山东模式）。原图混淆了这两类困难。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        var dom = document.getElementById('scatterChart');
+        var myChart = echarts.init(dom);
+        var app = {};
+
+        // 数据结构: [生存成本指数(X), 211录取率(Y), 考生人数(Size), 省份名, 原图评级, 描述]
+        // 成本指数是估算值：北京上海最高(90-100)，天津(75)，江苏浙江(65-70)，河南山东(40-50)，西藏青海(20-30)
+        var data = [
+            [95, 16.60, 6.8, '北京', '轻松模式', '高房价/高门槛换取的高录取率'],
+            [75, 13.00, 7.4, '天津', '轻松模式', '高考移民热门，生活成本较高'],
+            [92, 11.20, 5.8, '上海', '轻松模式', '顶级金融门槛，极高生存成本'],
+            [25, 10.40, 5.9, '青海', '简单模式', '地广人稀，政策扶持'],
+            [35, 5.20, 20.3, '辽宁', '简单模式', '老工业基地，竞争适中'],
+            [30, 8.00, 13.2, '吉林', '简单模式', '人口外流，压力较小'],
+            [55, 4.50, 24.7, '福建', '简单模式', '经商氛围浓，教育内卷一般'],
+            [28, 7.70, 8.2, '宁夏', '简单模式', '西部红利'],
+            [50, 4.60, 35.0, '重庆', '简单模式', '人口虽多，但高校资源尚可'],
+            [30, 4.50, 23.0, '内蒙古', '简单模式', '高考移民目标地之一'],
+            [45, 5.40, 35.0, '陕西', '简单模式', '高校资源丰富，本地优惠'],
+            [68, 5.50, 48.0, '江苏', '简单模式', '地狱级中考，高考反而显得容易'], // 原图标注简单，但其实过程极难
+            [20, 7.00, 23.0, '新疆', '普通模式', '政策优势明显'],
+            [25, 5.40, 21.1, '黑龙江', '普通模式', '人口流失严重，竞争减小'],
+            [15, 9.90, 3.9, '西藏', '普通模式', '真正的政策红利天花板'],
+            [60, 5.30, 7.3, '海南', '普通模式', '转换赛道的热门地'],
+            [40, 3.70, 88.0, '河北', '普通模式', '衡水模式发源地，这也能叫普通？'],
+            [42, 4.00, 67.0, '安徽', '普通模式', '长三角腹地，竞争激烈'],
+            [45, 4.60, 52.0, '湖北', '普通模式', '教育大省，题目难'],
+            [48, 3.50, 99.8, '山东', '普通模式', '考公大省，实际竞争极强'],
+            [70, 3.90, 40.5, '浙江', '困难模式', '赋分制极其残酷，经济发达成本高'],
+            [28, 3.10, 26.0, '甘肃', '困难模式', '资源匮乏'],
+            [30, 4.60, 50.6, '贵州', '困难模式', '大数据中心，教育资源待提升'],
+            [35, 5.30, 35.4, '山西', '困难模式', '资源型省份转型'],
+            [45, 3.80, 83.0, '四川', '噩梦模式', '人多，好学校相对少'],
+            [32, 4.00, 40.6, '云南', '噩梦模式', '边陲省份，关注度低'],
+            [40, 3.30, 70.0, '湖南', '噩梦模式', '也是教育强省，内卷严重'],
+            [35, 5.40, 48.0, '广西', '噩梦模式', '经济与教育的双重压力'],
+            [40, 4.00, 136.0, '河南', '地狱模式', '人口第一大省，资源极其匮乏'],
+            [85, 3.00, 76.0, '广东', '地狱模式', '外来人口多，学位缺口大，成本高'],
+            [38, 3.50, 65.0, '江西', '地狱模式', '环江西高校带，被吸血严重']
+        ];
+
+        // 颜色映射
+        var colorMap = {
+            '轻松模式': '#3b82f6', // Blue
+            '简单模式': '#60a5fa', // Light Blue
+            '普通模式': '#9ca3af', // Gray
+            '困难模式': '#fbbf24', // Yellow
+            '噩梦模式': '#f87171', // Red
+            '地狱模式': '#b91c1c'  // Dark Red
+        };
+
+        var option = {
+            backgroundColor: new echarts.graphic.RadialGradient(0.3, 0.3, 0.8, [{
+                offset: 0,
+                color: '#f7f8fa'
+            }, {
+                offset: 1,
+                color: '#cdd0d5'
+            }]),
+            title: {
+                text: '2025 高考投入产出 (ROI) 象限图',
+                subtext: '气泡大小 = 考生人数 | 颜色 = 原图评级',
+                left: 'center',
+                top: 20
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: function (param) {
+                    var v = param.data;
+                    return `
+                        <div style="font-weight:bold; font-size:16px; margin-bottom:5px;">${v[3]}</div>
+                        <span style="color:${colorMap[v[4]]}">●</span> 原评级: ${v[4]}<br/>
+                        <hr style="margin:5px 0; border:0; border-top:1px solid #ddd;"/>
+                        <strong>📊 投入 (X轴):</strong> ${v[0]} (生活/居住成本)<br/>
+                        <strong>🎓 收益 (Y轴):</strong> ${v[1]}% (211录取率)<br/>
+                        <strong>👥 竞争 (大小):</strong> ${v[2]} 万人<br/>
+                        <div style="margin-top:5px; color:#666; font-size:12px; max-width:200px;">
+                            <i>"${v[5]}"</i>
+                        </div>
+                    `;
+                },
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                borderColor: '#ccc',
+                borderWidth: 1,
+                padding: 15,
+                textStyle: {
+                    color: '#000'
+                }
+            },
+            grid: {
+                left: '8%',
+                right: '15%',
+                top: '15%',
+                bottom: '10%',
+                containLabel: true
+            },
+            xAxis: {
+                name: '获得考籍的经济/社会成本 (指数)',
+                nameLocation: 'middle',
+                nameGap: 30,
+                splitLine: {
+                    lineStyle: {
+                        type: 'dashed'
+                    }
+                },
+                min: 10,
+                max: 100
+            },
+            yAxis: {
+                name: '211 录取率 (%)',
+                splitLine: {
+                    lineStyle: {
+                        type: 'dashed'
+                    }
+                },
+                scale: true
+            },
+            series: [{
+                name: 'Provinces',
+                type: 'scatter',
+                data: data,
+                symbolSize: function (data) {
+                    // 气泡大小映射，避免过大或过小
+                    return Math.sqrt(data[2]) * 8; 
+                },
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowColor: 'rgba(120, 36, 50, 0.5)',
+                    shadowOffsetY: 5,
+                    color: function(params) {
+                        return colorMap[params.data[4]];
+                    },
+                    opacity: 0.8
+                },
+                label: {
+                    show: true,
+                    formatter: function (param) {
+                        return param.data[3];
+                    },
+                    position: 'top',
+                    fontSize: 11,
+                    fontWeight: 'bold'
+                },
+                markLine: {
+                    animation: false,
+                    lineStyle: {
+                        type: 'solid',
+                        color: '#333',
+                        width: 1
+                    },
+                    label: {
+                        show: true,
+                        position: 'end'
+                    },
+                    data: [
+                        { xAxis: 50, name: '成本均线' }, // 竖线
+                        { yAxis: 8, name: '录取率均线' } // 横线
+                    ]
+                },
+                markArea: {
+                    silent: true,
+                    itemStyle: {
+                        color: 'transparent',
+                        borderWidth: 1,
+                        borderType: 'dashed'
+                    },
+                    data: [
+                        [{
+                            name: '高投入高回报\n(氪金区)',
+                            xAxis: 50,
+                            yAxis: 8,
+                            itemStyle: {
+                                color: 'rgba(59, 130, 246, 0.1)'
+                            },
+                            label: {
+                                position: ['90%', '90%'],
+                                color: '#1e40af',
+                                fontSize: 14,
+                                fontWeight: 'bold'
+                            }
+                        }, {
+                            xAxis: 100,
+                            yAxis: 20
+                        }],
+                        [{
+                            name: '低投入高回报\n(红利区)',
+                            xAxis: 10,
+                            yAxis: 8,
+                            itemStyle: {
+                                color: 'rgba(34, 197, 94, 0.1)'
+                            },
+                            label: {
+                                position: ['10%', '90%'],
+                                color: '#15803d',
+                                fontSize: 14,
+                                fontWeight: 'bold'
+                            }
+                        }, {
+                            xAxis: 50,
+                            yAxis: 20
+                        }],
+                        [{
+                            name: '低投入低回报\n(普通内卷)',
+                            xAxis: 10,
+                            yAxis: 0,
+                            itemStyle: {
+                                color: 'rgba(243, 244, 246, 0.5)'
+                            },
+                            label: {
+                                position: ['10%', '10%'],
+                                color: '#6b7280',
+                                fontSize: 12
+                            }
+                        }, {
+                            xAxis: 50,
+                            yAxis: 8
+                        }],
+                        [{
+                            name: '高成本/高竞争\n(深坑区)',
+                            xAxis: 50,
+                            yAxis: 0,
+                            itemStyle: {
+                                color: 'rgba(220, 38, 38, 0.1)'
+                            },
+                            label: {
+                                position: ['90%', '10%'],
+                                color: '#b91c1c',
+                                fontSize: 14,
+                                fontWeight: 'bold'
+                            }
+                        }, {
+                            xAxis: 100,
+                            yAxis: 8
+                        }]
+                    ]
+                }
+            }]
+        };
+
+        if (option && typeof option === 'object') {
+            myChart.setOption(option);
+        }
+
+        window.addEventListener('resize', myChart.resize);
+    </script>
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字校验算法可视化：信用卡/IMEI/身份证</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0;
+        }
+        .mono {
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        /* 动画关键帧 */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* 卡片基础样式 */
+        .digit-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Luhn 模式样式 */
+        .mode-luhn .digit-card.doubled {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+            border-color: #818cf8;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        .mode-luhn .digit-card.normal {
+            background-color: #1e293b;
+            border-color: #334155;
+        }
+
+        /* 身份证模式样式 */
+        .mode-id .digit-card.weighted {
+            background: linear-gradient(135deg, #059669 0%, #065f46 100%); /* Emerald */
+            border-color: #34d399;
+            transform: translateY(-3px);
+        }
+        .mode-id .digit-card.check {
+            background-color: #1e293b;
+            border-color: #f59e0b;
+            border-style: dashed;
+            color: #f59e0b;
+        }
+
+        .operation-text {
+            font-size: 0.65rem;
+            opacity: 0; /* 默认隐藏，有特定类时显示 */
+            transition: opacity 0.3s;
+        }
+        /* 只要有运算详情就显示 */
+        .has-op .operation-text {
+            opacity: 1;
+        }
+        
+        /* 结果状态颜色 */
+        .status-valid {
+            background: linear-gradient(to right, #059669, #10b981);
+            border-color: #34d399;
+        }
+        .status-invalid {
+            background: linear-gradient(to right, #dc2626, #ef4444);
+            border-color: #f87171;
+        }
+
+        /* Tab 激活状态 */
+        .tab-active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #60a5fa;
+        }
+        .tab-inactive {
+            background-color: #1e293b;
+            color: #94a3b8;
+            border-color: #334155;
+        }
+        .tab-inactive:hover {
+            background-color: #334155;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-2 md:px-4">
+
+    <!-- 标题区 -->
+    <header class="text-center mb-6 max-w-2xl">
+        <h1 class="text-2xl md:text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+            数字校验算法可视化
+        </h1>
+        <p class="text-slate-400 text-xs md:text-sm">
+            揭秘 信用卡 / IMEI / 身份证号 背后的数学逻辑
+        </p>
+    </header>
+
+    <!-- 模式切换 Tabs -->
+    <div class="flex gap-2 mb-4 w-full max-w-4xl justify-center">
+        <button onclick="switchMode('luhn')" id="tab-luhn" class="flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-sm md:text-base tab-active shadow-lg">
+            💳 Luhn 算法
+            <div class="text-[10px] font-normal opacity-80">信用卡 / IMEI</div>
+        </button>
+        <button onclick="switchMode('id')" id="tab-id" class="flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-sm md:text-base tab-inactive shadow-lg">
+            🆔 ISO 7064
+            <div class="text-[10px] font-normal opacity-80">中国居民身份证</div>
+        </button>
+    </div>
+
+    <!-- 主面板 -->
+    <div class="w-full max-w-4xl bg-slate-800 rounded-2xl p-4 md:p-6 shadow-2xl border border-slate-700 mb-6 transition-colors duration-500" id="main-panel">
+        
+        <!-- 输入区 -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <label class="block text-slate-300 text-sm font-bold" id="input-label">
+                    输入卡号/IMEI (纯数字)
+                </label>
+                <span id="length-indicator" class="text-xs text-slate-500">0 位</span>
+            </div>
+            
+            <div class="relative">
+                <input type="text" id="main-input" 
+                    class="mono w-full bg-slate-900 border-2 border-slate-600 rounded-xl py-3 px-4 md:py-4 md:px-6 text-xl md:text-3xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-colors tracking-widest uppercase"
+                    placeholder="4000 1234 5678 9010"
+                    autocomplete="off">
+            </div>
+            
+            <!-- 示例按钮组 -->
+            <div class="flex flex-wrap gap-2 mt-3" id="example-buttons">
+                <!-- 由 JS 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 算法图例 (动态变化) -->
+        <div id="legend-area" class="flex flex-wrap gap-3 text-xs text-slate-400 mb-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+            <!-- 由 JS 动态填充 -->
+        </div>
+
+        <!-- 视觉展示区 -->
+        <div id="visualization-area" class="flex flex-wrap justify-center gap-1 md:gap-3 py-4 min-h-[120px]">
+            <div class="text-slate-500 flex items-center h-full text-sm">请输入数字以查看算法过程...</div>
+        </div>
+    </div>
+
+    <!-- 结果面板 -->
+    <div id="result-panel" class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4 opacity-0 transition-opacity duration-500">
+        
+        <!-- 计算步骤 1: 总和 -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col items-center justify-center relative overflow-hidden">
+            <span class="text-slate-400 text-xs md:text-sm mb-1 z-10">1. 加权求和 (Sum)</span>
+            <div class="text-3xl md:text-4xl font-bold mono text-white z-10" id="res-sum">0</div>
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent"></div>
+        </div>
+
+        <!-- 计算步骤 2: 取模 -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col items-center justify-center relative overflow-hidden">
+            <span class="text-slate-400 text-xs md:text-sm mb-1 z-10" id="label-mod">2. 取模运算</span>
+            <div class="flex items-baseline z-10">
+                <span class="text-3xl md:text-4xl font-bold mono text-white" id="res-mod">0</span>
+                <span class="ml-2 text-slate-500 text-sm" id="res-mod-base">/ 10</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-1 z-10 text-center px-2" id="res-mod-desc">需整除</div>
+        </div>
+
+        <!-- 最终结果 -->
+        <div id="final-status" class="p-4 rounded-xl border flex flex-col items-center justify-center transition-colors duration-300 bg-slate-700 border-slate-600">
+            <span class="text-white/80 text-xs md:text-sm mb-1">验证结果</span>
+            <div class="flex items-center gap-2">
+                <span id="status-icon" class="text-2xl">🤔</span>
+                <span id="status-text" class="text-xl md:text-2xl font-bold text-white">等待输入</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 算法说明文本 (底部) -->
+    <div id="explanation-text" class="max-w-3xl mt-8 md:mt-12 text-slate-400 text-xs md:text-sm leading-relaxed space-y-4 px-2">
+        <!-- 动态填充 -->
+    </div>
+
+    <script>
+        // --- 状态与配置 ---
+        let currentMode = 'luhn'; // 'luhn' 或 'id'
+
+        const CONFIG = {
+            luhn: {
+                name: "Luhn 算法",
+                inputLabel: "输入信用卡号或 IMEI (纯数字)",
+                placeholder: "4000 1234 5678 9010",
+                maxLen: 23, // 允许空格
+                allowChar: /[^\d\s]/g,
+                modBase: 10,
+                themeColor: 'indigo',
+                examples: [
+                    { label: "Visa (有效)", val: "4532 0151 1283 0366" },
+                    { label: "IMEI (有效)", val: "3589 0123 4567 896" }, 
+                    { label: "错误示例", val: "4532 0151 1283 0367" }
+                ]
+            },
+            id: {
+                name: "中国身份证 (ISO 7064)",
+                inputLabel: "输入 18 位身份证号",
+                placeholder: "110105 19900101 123X",
+                maxLen: 21, // 允许空格
+                allowChar: /[^0-9Xx\s]/g,
+                modBase: 11,
+                themeColor: 'emerald',
+                examples: [
+                    { label: "有效示例 (男)", val: "110101 19900307 8881" }, 
+                    { label: "有效示例 (X结尾)", val: "110101 19900307 002X" },
+                    { label: "错误示例", val: "110101 19900307 7218" }
+                ]
+            }
+        };
+
+        const ID_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+        const ID_CHECK_MAP = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+
+        // --- DOM 元素 ---
+        const els = {
+            input: document.getElementById('main-input'),
+            visualArea: document.getElementById('visualization-area'),
+            resultPanel: document.getElementById('result-panel'),
+            legendArea: document.getElementById('legend-area'),
+            exampleArea: document.getElementById('example-buttons'),
+            explanation: document.getElementById('explanation-text'),
+            resSum: document.getElementById('res-sum'),
+            resMod: document.getElementById('res-mod'),
+            resModBase: document.getElementById('res-mod-base'),
+            resModDesc: document.getElementById('res-mod-desc'),
+            finalStatus: document.getElementById('final-status'),
+            statusText: document.getElementById('status-text'),
+            statusIcon: document.getElementById('status-icon'),
+            labelMod: document.getElementById('label-mod'),
+            lengthIndicator: document.getElementById('length-indicator'),
+            tabLuhn: document.getElementById('tab-luhn'),
+            tabId: document.getElementById('tab-id'),
+            mainPanel: document.getElementById('main-panel')
+        };
+
+        // --- 初始化 ---
+        function init() {
+            switchMode('luhn'); // 默认模式
+            
+            els.input.addEventListener('input', (e) => {
+                handleInput(e);
+            });
+        }
+
+        // --- 核心逻辑：切换模式 ---
+        function switchMode(mode) {
+            currentMode = mode;
+            const conf = CONFIG[mode];
+
+            // 1. 更新 Tabs 样式
+            if (mode === 'luhn') {
+                els.tabLuhn.className = els.tabLuhn.className.replace('tab-inactive', 'tab-active').replace('border-slate-700', 'border-blue-400');
+                els.tabId.className = els.tabId.className.replace('tab-active', 'tab-inactive');
+                els.mainPanel.className = "w-full max-w-4xl bg-slate-800 rounded-2xl p-4 md:p-6 shadow-2xl border border-indigo-900/50 mb-6";
+            } else {
+                els.tabId.className = els.tabId.className.replace('tab-inactive', 'tab-active').replace('border-slate-700', 'border-emerald-400');
+                els.tabLuhn.className = els.tabLuhn.className.replace('tab-active', 'tab-inactive');
+                els.mainPanel.className = "w-full max-w-4xl bg-slate-800 rounded-2xl p-4 md:p-6 shadow-2xl border border-emerald-900/50 mb-6";
+            }
+
+            // 2. 更新输入框配置
+            els.input.value = '';
+            els.input.placeholder = conf.placeholder;
+            els.input.maxLength = conf.maxLen;
+            document.getElementById('input-label').innerText = conf.inputLabel;
+            
+            // 3. 更新示例按钮
+            els.exampleArea.innerHTML = conf.examples.map(ex => 
+                `<button onclick="setInput('${ex.val}')" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition border border-slate-600">
+                    ${ex.label}
+                </button>`
+            ).join('') + 
+            `<button onclick="setInput('')" class="text-xs bg-slate-700 hover:bg-red-900/50 text-red-300 px-3 py-1.5 rounded-lg transition border border-slate-600 ml-auto">清空</button>`;
+
+            // 4. 更新图例和说明
+            updateStaticContent(mode);
+            
+            // 5. 重置视图
+            renderVisualization('');
+        }
+
+        function updateStaticContent(mode) {
+            if (mode === 'luhn') {
+                els.legendArea.innerHTML = `
+                    <div class="flex items-center"><div class="w-3 h-3 bg-indigo-600 border border-indigo-400 mr-2 rounded"></div><span>偶数位：×2 (若>9则-9)</span></div>
+                    <div class="flex items-center"><div class="w-3 h-3 bg-slate-700 border border-slate-500 mr-2 rounded"></div><span>奇数位：保持不变</span></div>
+                    <div class="ml-auto italic text-slate-500">* 从右向左计算</div>
+                `;
+                els.explanation.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-200">Luhn 算法 (模10) 原理</h3>
+                    <ol class="list-decimal pl-5 space-y-1 text-slate-400">
+                        <li>从最后一位开始向左，每隔一位（偶数索引）将数字乘以 2。</li>
+                        <li>如果乘积大于 9，则将各位数字相加（或减 9）。</li>
+                        <li>将所有处理后的数字求和。</li>
+                        <li>如果总和能被 10 整除，则校验通过。</li>
+                    </ol>
+                `;
+                els.resModBase.innerText = "/ 10";
+                els.resModDesc.innerText = "余数必须为 0";
+            } else {
+                els.legendArea.innerHTML = `
+                    <div class="flex items-center"><div class="w-3 h-3 bg-emerald-700 border border-emerald-500 mr-2 rounded"></div><span>前17位：× 加权因子</span></div>
+                    <div class="flex items-center"><div class="w-3 h-3 bg-slate-800 border border-yellow-500 border-dashed mr-2 rounded"></div><span>第18位：校验码</span></div>
+                `;
+                els.explanation.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-200">身份证 (ISO 7064) 校验原理</h3>
+                    <ol class="list-decimal pl-5 space-y-1 text-slate-400">
+                        <li>对前 17 位数字，分别乘以对应的加权因子：<br><span class="font-mono text-xs text-emerald-400">[7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]</span></li>
+                        <li>将所有乘积相加得到总和 S。</li>
+                        <li>计算余数 Y = S mod 11。</li>
+                        <li>根据余数 Y 查表得到校验码：<br><span class="font-mono text-xs text-yellow-400">0→1, 1→0, 2→X, 3→9, 4→8, 5→7, 6→6, 7→5, 8→4, 9→3, 10→2</span></li>
+                    </ol>
+                `;
+                els.resModBase.innerText = "/ 11";
+                els.resModDesc.innerText = "根据余数查表";
+            }
+        }
+
+        // --- 输入处理 ---
+        function handleInput(e) {
+            let val = e.target.value.toUpperCase();
+            // 过滤非法字符
+            val = val.replace(CONFIG[currentMode].allowChar, '');
+            
+            // 格式化显示 (加空格)
+            let formatted = "";
+            let raw = val.replace(/\s/g, '');
+            
+            if (currentMode === 'luhn') {
+                // 每4位加空格
+                formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ');
+            } else {
+                // 身份证: 6 8 4 (110101 19900101 123X)
+                if (raw.length > 6) formatted += raw.slice(0,6) + " ";
+                if (raw.length > 14) {
+                    formatted += raw.slice(6,14) + " " + raw.slice(14);
+                } else if (raw.length > 6) {
+                    formatted += raw.slice(6);
+                } else {
+                    formatted = raw;
+                }
+            }
+            
+            // 如果用户正在删除，避免光标跳动太严重，这只是一个简单的处理
+            if (val.length < e.target.value.length) {
+                // Deleting, do simple trim
+            } else {
+                e.target.value = formatted.trim();
+            }
+            
+            els.lengthIndicator.innerText = `${raw.length} 位`;
+            renderVisualization(raw);
+        }
+
+        function setInput(val) {
+            els.input.value = val;
+            els.input.dispatchEvent(new Event('input'));
+        }
+
+        // --- 核心渲染与算法逻辑 ---
+        function renderVisualization(raw) {
+            els.visualArea.innerHTML = '';
+            
+            if (!raw) {
+                els.resultPanel.classList.add('opacity-0');
+                els.visualArea.innerHTML = '<div class="text-slate-500 flex items-center h-full text-sm">请输入数字以查看算法过程...</div>';
+                return;
+            }
+            
+            els.resultPanel.classList.remove('opacity-0');
+            els.visualArea.className = `flex flex-wrap justify-center gap-1 md:gap-3 py-4 min-h-[120px] mode-${currentMode}`;
+
+            if (currentMode === 'luhn') {
+                processLuhn(raw);
+            } else {
+                processID(raw);
+            }
+        }
+
+        function createCard(char, topText, bottomText, classes, delayIdx) {
+            const card = document.createElement('div');
+            // 基础样式
+            let baseClasses = `digit-card relative flex flex-col items-center justify-center w-8 h-12 md:w-12 md:h-20 rounded-lg border select-none ${classes}`;
+            if (topText || bottomText) baseClasses += " has-op";
+            
+            card.className = baseClasses;
+            card.style.animation = `popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards`;
+            card.style.animationDelay = `${delayIdx * 0.03}s`;
+            card.style.opacity = '0';
+
+            // Top
+            if (topText) {
+                const topEl = document.createElement('div');
+                topEl.className = "operation-text absolute -top-4 md:-top-5 text-[10px] whitespace-nowrap font-mono text-slate-400";
+                topEl.innerText = topText;
+                card.appendChild(topEl);
+            }
+
+            // Main
+            const mainEl = document.createElement('div');
+            mainEl.className = "text-lg md:text-2xl font-bold mono";
+            mainEl.innerText = char;
+            card.appendChild(mainEl);
+
+            // Bottom
+            if (bottomText) {
+                const botEl = document.createElement('div');
+                botEl.className = "operation-text absolute -bottom-4 md:-bottom-5 text-[10px] font-bold text-green-400 md:text-xs";
+                botEl.innerText = bottomText;
+                card.appendChild(botEl);
+            }
+
+            return card;
+        }
+
+        function processLuhn(raw) {
+            const digits = raw.split('').map(Number);
+            let sum = 0;
+
+            digits.forEach((digit, index) => {
+                // 判断是否是加倍位：从右数第2个开始 (即 (len - 1 - index) % 2 === 1)
+                const isDoubled = (digits.length - 1 - index) % 2 === 1;
+                const isLast = index === digits.length - 1;
+                
+                let val = digit;
+                let topTxt = "";
+                let botTxt = "";
+                let cls = "normal text-slate-300 border-slate-700";
+
+                if (isDoubled) {
+                    cls = "doubled text-white border-indigo-400 z-10";
+                    let doubled = digit * 2;
+                    topTxt = `×2`;
+                    if (doubled > 9) {
+                        val = doubled - 9;
+                        botTxt = `${doubled}→${val}`;
+                    } else {
+                        val = doubled;
+                        // 只有变了或者强调才显示bottom，这里如果不大于9，就是本身x2
+                        // 为了整洁，如果数字变了显示箭头，如果没变（0-4）其实就是x2的结果
+                        // Luhn里一般习惯显示最终贡献值
+                        if (val !== digit) botTxt = `=${val}`;
+                    }
+                } else if (isLast) {
+                    cls = "bg-slate-800 border-yellow-500 text-yellow-500 border-dashed";
+                    topTxt = "校验位";
+                }
+
+                sum += val;
+                els.visualArea.appendChild(createCard(digit, topTxt, botTxt, cls, index));
+            });
+
+            const isValid = sum % 10 === 0;
+            updateResultUI(sum, sum % 10, isValid, "Luhn");
+        }
+
+        function processID(raw) {
+            const chars = raw.split('');
+            let sum = 0;
+            let weightsLen = ID_WEIGHTS.length; // 17
+
+            chars.forEach((char, index) => {
+                let cls = "text-slate-300 border-slate-700 bg-slate-800";
+                let topTxt = "";
+                let botTxt = "";
+                let digitVal = parseInt(char, 10);
+                
+                if (index < weightsLen) {
+                    // 加权位
+                    cls = "weighted text-white border-emerald-500 z-10";
+                    const weight = ID_WEIGHTS[index];
+                    topTxt = `×${weight}`;
+                    
+                    if (!isNaN(digitVal)) {
+                        const product = digitVal * weight;
+                        sum += product;
+                        botTxt = `${product}`;
+                    } else {
+                         // 输入了非数字在前面（理论上正则已挡，防万一）
+                    }
+                } else if (index === weightsLen) {
+                    // 校验位 (第18位)
+                    cls = "check";
+                    topTxt = "校验位";
+                } else {
+                    // 超出位数
+                    cls = "opacity-50 border-red-900";
+                }
+
+                els.visualArea.appendChild(createCard(char, topTxt, botTxt, cls, index));
+            });
+
+            // 只有当输入满 17 位以上才开始真正判断
+            let isValid = false;
+            let mod = 0;
+            let correctCode = "?";
+
+            if (chars.length >= 17) { // 至少计算了前17位
+                mod = sum % 11;
+                correctCode = ID_CHECK_MAP[mod];
+                els.resModDesc.innerText = `余数 ${mod} 对应码 ${correctCode}`;
+                
+                if (chars.length === 18) {
+                    isValid = chars[17] === correctCode;
+                }
+            } else {
+                els.resModDesc.innerText = "位数不足";
+            }
+
+            updateResultUI(sum, mod, isValid, "ID", chars.length === 18 ? correctCode : null);
+        }
+
+        function updateResultUI(sum, mod, isValid, type, expectedCheckDigit) {
+            animateValue(els.resSum, parseInt(els.resSum.innerText) || 0, sum, 500);
+            els.resMod.innerText = mod;
+
+            els.finalStatus.className = "p-4 rounded-xl border flex flex-col items-center justify-center transition-colors duration-300 ";
+            
+            // 逻辑微调：如果是 ID 模式，必须满 18 位才显示有效/无效，否则显示“计算中”
+            if (type === 'ID' && els.input.value.replace(/\s/g,'').length < 18) {
+                els.finalStatus.classList.add('bg-slate-700', 'border-slate-600');
+                els.statusText.innerText = "输入中...";
+                els.statusIcon.innerText = "⌨️";
+                return;
+            }
+            
+            if (isValid) {
+                els.finalStatus.classList.add('status-valid');
+                els.statusText.innerText = "验证通过";
+                els.statusIcon.innerText = "✅";
+            } else {
+                els.finalStatus.classList.add('status-invalid');
+                els.statusText.innerText = "验证失败";
+                els.statusIcon.innerText = "❌";
+                if (type === 'ID' && expectedCheckDigit) {
+                    els.statusText.innerText = `应为 ${expectedCheckDigit}`;
+                }
+            }
+        }
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                obj.innerHTML = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = end;
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Run
+        init();
+
+    </script>
+</body>
+</html>

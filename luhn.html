@@ -150,6 +150,14 @@
         <div id="visualization-area" class="flex flex-wrap justify-center gap-1 md:gap-3 py-4 min-h-[120px]">
             <div class="text-slate-500 flex items-center h-full text-sm">请输入数字以查看算法过程...</div>
         </div>
+
+        <!-- 新增：运算过程公式展示 -->
+        <div id="formula-container" class="mt-2 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 hidden">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">计算过程 (Calculation Process)</div>
+            <div id="calc-formula" class="font-mono text-xs md:text-sm text-slate-300 whitespace-nowrap overflow-x-auto pb-1 scrollbar-thin">
+                <!-- 公式将显示在这里 -->
+            </div>
+        </div>
     </div>
 
     <!-- 结果面板 -->
@@ -244,7 +252,10 @@
             lengthIndicator: document.getElementById('length-indicator'),
             tabLuhn: document.getElementById('tab-luhn'),
             tabId: document.getElementById('tab-id'),
-            mainPanel: document.getElementById('main-panel')
+            mainPanel: document.getElementById('main-panel'),
+            // 新增引用
+            calcFormula: document.getElementById('calc-formula'),
+            formulaContainer: document.getElementById('formula-container')
         };
 
         // --- 初始化 ---
@@ -377,11 +388,13 @@
             
             if (!raw) {
                 els.resultPanel.classList.add('opacity-0');
+                els.formulaContainer.classList.add('hidden'); // 隐藏公式
                 els.visualArea.innerHTML = '<div class="text-slate-500 flex items-center h-full text-sm">请输入数字以查看算法过程...</div>';
                 return;
             }
             
             els.resultPanel.classList.remove('opacity-0');
+            els.formulaContainer.classList.remove('hidden'); // 显示公式
             els.visualArea.className = `flex flex-wrap justify-center gap-1 md:gap-3 py-4 min-h-[120px] mode-${currentMode}`;
 
             if (currentMode === 'luhn') {
@@ -430,6 +443,7 @@
         function processLuhn(raw) {
             const digits = raw.split('').map(Number);
             let sum = 0;
+            let formulaParts = []; // 用于存储公式部分
 
             digits.forEach((digit, index) => {
                 // 判断是否是加倍位：从右数第2个开始 (即 (len - 1 - index) % 2 === 1)
@@ -448,21 +462,29 @@
                     if (doubled > 9) {
                         val = doubled - 9;
                         botTxt = `${doubled}→${val}`;
+                        formulaParts.push(`<span class="text-indigo-400">(${digit}×2-9)</span>`);
                     } else {
                         val = doubled;
                         // 只有变了或者强调才显示bottom，这里如果不大于9，就是本身x2
-                        // 为了整洁，如果数字变了显示箭头，如果没变（0-4）其实就是x2的结果
                         // Luhn里一般习惯显示最终贡献值
                         if (val !== digit) botTxt = `=${val}`;
+                        formulaParts.push(`<span class="text-indigo-400">(${digit}×2)</span>`);
                     }
                 } else if (isLast) {
                     cls = "bg-slate-800 border-yellow-500 text-yellow-500 border-dashed";
                     topTxt = "校验位";
+                    formulaParts.push(`<span class="text-yellow-500">${digit}</span>`);
+                } else {
+                    // 普通奇数位
+                    formulaParts.push(digit);
                 }
 
                 sum += val;
                 els.visualArea.appendChild(createCard(digit, topTxt, botTxt, cls, index));
             });
+
+            // 更新公式显示
+            els.calcFormula.innerHTML = formulaParts.join(' + ') + ` = <span class="text-white font-bold text-lg">${sum}</span>`;
 
             const isValid = sum % 10 === 0;
             updateResultUI(sum, sum % 10, isValid, "Luhn");
@@ -472,6 +494,7 @@
             const chars = raw.split('');
             let sum = 0;
             let weightsLen = ID_WEIGHTS.length; // 17
+            let formulaParts = [];
 
             chars.forEach((char, index) => {
                 let cls = "text-slate-300 border-slate-700 bg-slate-800";
@@ -489,13 +512,17 @@
                         const product = digitVal * weight;
                         sum += product;
                         botTxt = `${product}`;
+                        formulaParts.push(`<span class="text-emerald-400">(${char}×${weight})</span>`);
                     } else {
                          // 输入了非数字在前面（理论上正则已挡，防万一）
+                         formulaParts.push('?');
                     }
                 } else if (index === weightsLen) {
                     // 校验位 (第18位)
                     cls = "check";
                     topTxt = "校验位";
+                    // 身份证算法中，前17位算出的Sum取模后，用来“推导”第18位，而不是把第18位加进Sum里
+                    // 但为了展示方便，我们可以只显示前17位的累加过程
                 } else {
                     // 超出位数
                     cls = "opacity-50 border-red-900";
@@ -503,6 +530,13 @@
 
                 els.visualArea.appendChild(createCard(char, topTxt, botTxt, cls, index));
             });
+
+            // 更新公式显示 (仅显示前17位的加权和)
+            if (formulaParts.length > 0) {
+                els.calcFormula.innerHTML = formulaParts.join(' + ') + ` = <span class="text-white font-bold text-lg">${sum}</span>`;
+            } else {
+                els.calcFormula.innerHTML = '';
+            }
 
             // 只有当输入满 17 位以上才开始真正判断
             let isValid = false;
